@@ -20,6 +20,13 @@ data QueryResponse a = QueryResponse{
   qrDone :: Bool
 } deriving Show
 
+data QueryResponseWithCursor a = QueryResponseWithCursor{
+  qrwcRecords :: [a],
+  qrwcTotalSize :: Int,
+  qrwcDone :: Bool,
+  qrwcNextRecordsUrl :: String
+} deriving Show
+
 class SObject a where
   typeName :: a -> String
   getSfid :: a -> String
@@ -246,6 +253,7 @@ data Note = Note{
 } deriving Show
 
 deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "qr" } ''QueryResponse
+deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "qrwc" } ''QueryResponseWithCursor
 deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "dr" } ''DescribeResponse
 deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "od" } ''ObjectDescribe
 deriveJSON defaultOptions { fieldLabelModifier = defaultJsonLabelFilter "dd" } ''DescribeDetail

@@ -10,8 +10,10 @@ module HSForce
       defaultLoginRequest,
       HSForce.versions,
       HSForce.query,
+      HSForce.queryWithCursor,
       HSForce.queryAll,
       HSForce.queryMore,
+      HSForce.queryMoreWithCursor,
       HSForce.queryAllMore,
       HSForce.recordCount,
       HSForce.insert,
@@ -27,18 +29,22 @@ module HSForce
       HSForce.Client.SFClient(..),
     ) where
 
+import Control.Lens
+import qualified Data.ByteString as B
 import Network.HTTP.Conduit
 import Network.URI
 import Network.URI.Encode as URI
 import System.IO
 import System.Environment
 import Data.Aeson as JSON
+import Data.Aeson.Lens
 import Data.Aeson.TH (deriveJSON, defaultOptions, Options(..))
 import Data.ByteString.Char8 as B8
 import Data.ByteString.Lazy.Char8 as BL8
 import Data.Proxy as DP
 import Data.Maybe
 import Data.List as L
+import Data.Text (Text)
 import Text.HTML.TagSoup.Entity
 import Text.XML.HaXml
 import Text.XML.HaXml.Posn
@@ -62,6 +68,17 @@ query client q _ = do
   let res = (JSON.decode $ responseBody response) :: (FromJSON a) => Maybe (QueryResponse a)
   return (fromJust res)
 
+-- | Query Salesforce Object (With Possible Cursor).
+--
+queryWithCursor :: (FromJSON a) => SFClient -> String -> DP.Proxy a -> IO (Either (QueryResponse a) (QueryResponseWithCursor a))
+queryWithCursor client q _ = do
+  let path = dataPath client ++ "/query/?q=" ++ URI.encode q
+  response <- requestGet client path
+  let body = responseBody response
+  case body ^.. key "nextRecordsUrl" . _String of
+    []          -> return (Left $ fromJust ((JSON.decode body) :: (FromJSON a) => Maybe (QueryResponse a)))
+    [_ :: Text] -> return (Right $ fromJust ((JSON.decode body) :: (FromJSON a) => Maybe (QueryResponseWithCursor a)))
+
 -- | Query Salesforce Object more.
 --
 -- ==== __Examples__
@@ -72,6 +89,16 @@ queryMore client qpath _ = do
   response <- requestGet client qpath
   let res = (JSON.decode $ responseBody response) :: (FromJSON a) => Maybe (QueryResponse a)
   return (fromJust res)
+
+-- | Query Salesforce Object more (With Possible Cursor).
+--
+queryMoreWithCursor :: (FromJSON a) => SFClient -> String -> DP.Proxy a -> IO (Either (QueryResponse a) (QueryResponseWithCursor a))
+queryMoreWithCursor client qpath _ = do
+  response <- requestGet client qpath
+  let body = responseBody response
+  case body ^.. key "nextRecordsUrl" . _String of
+    []          -> return (Left $ fromJust ((JSON.decode body) :: (FromJSON a) => Maybe (QueryResponse a)))
+    [_ :: Text] -> return (Right $ fromJust ((JSON.decode body) :: (FromJSON a) => Maybe (QueryResponseWithCursor a)))
 
 -- | Query Salesforce Object more.
 --
