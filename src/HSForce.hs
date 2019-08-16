@@ -12,6 +12,7 @@ module HSForce
       HSForce.query,
       HSForce.queryWithCursor,
       HSForce.queryAll,
+      HSForce.queryAllWithCursor,
       HSForce.queryMore,
       HSForce.queryMoreWithCursor,
       HSForce.queryAllMore,
@@ -111,6 +112,17 @@ queryAll client q _ = do
   response <- requestGet client path
   let res = (JSON.decode $ responseBody response) :: (FromJSON a) => Maybe (QueryResponse a)
   return (fromJust res)
+
+-- | Query Salesforce Object (With Possible Cursor).
+--
+queryAllWithCursor :: (FromJSON a) => SFClient -> String -> DP.Proxy a -> IO (Either (QueryResponse a) (QueryResponseWithCursor a))
+queryAllWithCursor client q _ = do
+  let path = dataPath client ++ "/queryAll/?q=" ++ URI.encode q
+  response <- requestGet client path
+  let body = responseBody response
+  case body ^.. key "nextRecordsUrl" . _String of
+    []          -> return (Left $ fromJust ((JSON.decode body) :: (FromJSON a) => Maybe (QueryResponse a)))
+    [_ :: Text] -> return (Right $ fromJust ((JSON.decode body) :: (FromJSON a) => Maybe (QueryResponseWithCursor a)))
 
 -- | Query records more.
 --
