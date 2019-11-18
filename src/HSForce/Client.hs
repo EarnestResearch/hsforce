@@ -2,6 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
 
 module HSForce.Client
     (
@@ -41,6 +42,7 @@ import Text.Regex.Posix
 import GHC.Generics
 import HSForce.Util
 import Control.Applicative
+import Data.Aeson.Encode.Pretty
 
 data SFClient = SFClient {
   clientAccessToken :: String,
@@ -160,8 +162,10 @@ requestWithoutBody method client path = do
   }
   printDebug client req
   response <- httpLbs req manager
-  printDebug client response
-  return (response)
+
+  printDebugResponse client response
+  return response
+
 
 requestWithBody :: B8.ByteString -> SFClient -> String -> String -> IO (Response BL8.ByteString)
 requestWithBody method client path body = do
@@ -177,8 +181,9 @@ requestWithBody method client path body = do
   }
   printDebug client req
   response <- httpLbs req manager
-  printDebug client response
-  return (response)
+
+  printDebugResponse client response
+  return response
 
 requestPost :: SFClient -> String -> String -> IO (Response BL8.ByteString)
 requestPost = requestWithBody "POST"
@@ -189,6 +194,21 @@ requestPatch = requestWithBody "PATCH"
 printDebug :: (Show a) => SFClient -> a -> IO ()
 printDebug client var = do
   if clientDebug client then print var else pure ()
+
+
+printDebugResponse :: SFClient -> Response BL8.ByteString -> IO ()
+printDebugResponse client response = do
+  -- Response bodies are very long and hard to read when presented as a single
+  -- escaped string, print response headers only first
+  printDebug client (response { responseBody = () })
+
+  -- Print pretty JSON body
+  if (clientDebug client)
+  then case eitherDecode @Value (responseBody response)
+         of Left err -> print err
+            Right v -> BL8.putStrLn (encodePretty v)
+  else pure ()
+
 
 dataPath :: SFClient -> String
 dataPath client = do
